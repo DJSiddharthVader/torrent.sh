@@ -71,6 +71,7 @@ setMode() {
     sed -i "/^$MODE_PREFIX:/s/:.*/:$1/" "$MODE_FILE"
 }
 
+
 # Torrent Data Tracking
 get_info() {
     transmission-remote -tall -i
