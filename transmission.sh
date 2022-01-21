@@ -9,7 +9,7 @@ DOWNLOAD_DIR="$HOME/Torrents"
 VID_DIR="$HOME/Videos/ToOrganize"
 MODES=(ratiototal datatotal ratio data speed active) #no spaces in mode titles
 DELIM="~"
-SEARCH_SCRIPT="$HOME/dotfiles/.scripts/torrent/search.sh"
+SEARCH_SCRIPT="$(dirname $(readlink -e $0))/search.sh"
 
 help() {
     mode='$mode'
@@ -70,8 +70,6 @@ getMode() {
 setMode() {
     sed -i "/^$MODE_PREFIX:/s/:.*/:$1/" "$MODE_FILE"
 }
-
-
 # Torrent Data Tracking
 get_info() {
     transmission-remote -tall -i
@@ -117,7 +115,6 @@ update_stats() {
     sort -t"$DELIM" -r -g -k5,5 -k4,4 $tmp | sort -u -t"$DELIM" -k1,1 -o $tmp #dedup
     mv $tmp $STATS_FILE
 }
-
 # Display Torrent Data
 sum_convert() {
     # sum list of data sizes and format to desired unit (Kb, Mb, Gb, Tb)
@@ -209,7 +206,6 @@ display() {
     esac
     echo "$msg"
 }
-
 # Managing Torrents
 start_daemon() {
     sudo /etc/init.d/transmission-daemon start
@@ -252,8 +248,9 @@ delete_torrents() {
 }
 search() {
     # search online for torrents, get magnets and start downloading
+    echo $SEARCH_SCRIPT
     magnets="$($SEARCH_SCRIPT)"
-    echo -e "Found torrents\nAdding..."
+    echo -e "Adding torrents..."
     for magnet in ${magnets}; do
         transmission-remote -er -w $DOWNLOAD_DIR --add ${magnet}
     done

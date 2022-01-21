@@ -1,8 +1,8 @@
 #!/bin/bash
-# set -euo pipefail
 shopt -s extglob
 
-MAX_PAGES=3 # max number of results pages to parse when searching
+MAX_PAGES=4 # max number of results pages to parse when searching
+SEARCH_DIR="$(dirname $(readlink -e $0))"
 
 search() {
     # download search results for query
@@ -10,12 +10,11 @@ search() {
     query="$(rofi -lines 0 -dmenu -p "Enter Torrent Query")"
     [[ -z "$query" ]] && exit 1 # no query
     results=$(mktemp)
-    ~/.scripts/torrent/search_1337x.sh "$query" "$MAX_PAGES"  >| "$results"  
-    echo "Got 1337x results" 1>&2
-    ~/.scripts/torrent/search_kickass.sh "$query" "$MAX_PAGES" >> "$results" 
-    echo "Got kickass results" 1>&2
-    # formatted_results=$(mktemp)
-    formatted_results=~/dotfiles/.scripts/torrent/results.tsv
+    "$SEARCH_DIR"/search_kickass.sh "$query" "$MAX_PAGES" >> "$results" 
+    # echo "Got kickass results" 1>&2
+    "$SEARCH_DIR"/search_1337x.sh "$query" "$MAX_PAGES"  >> "$results"  
+    # echo "Got 1337x results" 1>&2
+    formatted_results="$(mktemp)"
     ids="$(seq 001 "$(wc -l "$results" | cut -d' ' -f1)")"  # make id for each torrent
     hashes="$(cut -f1 $results | sed -e 's/^.*btih:\([A-Z0-9]*\).*$/\1/')" # torrent hash for dedup
     # paste <(echo "$ids") $results \
