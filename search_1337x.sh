@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 shopt -s extglob
 
 BASE_URL="https://1337x.to"
@@ -11,8 +10,8 @@ help() {
 }
 get_results() {
     # download the search results for a torrent query from 1337x.to
-    query="${1:-}"
-    max_pages="${2:-}"
+    query="$1"
+    max_pages="$2"
     search_url="$BASE_SEARCH_URL/${query// /+}/1/"
     total_pages="$(curl -Ss "$search_url" | grep 'Last' | sed -s 's/^.*class=.last.><a href=.\/search\/.*\/\([0-9]*\)\/.>.*$/\1/')"
     [[ $max_pages -lt $total_pages ]] && total_pages=$max_pages
@@ -24,8 +23,8 @@ get_results() {
 }
 extract_from_page() {
     # extract information about each torrent from the downloaded html results
-    grep "${2:-}" "${1:-}" | sed -e "s/^.*>\([^<>]\+\)<${3:-}.*$/\1/"
-    # ${$1:-} is field, $2 is results page, $3 is the ending tag
+    grep "$2" "$1" | sed -e "s/^.*>\([^<>]\+\)<$3.*$/\1/"
+    # ${$1} is field, $2 is results page, $3 is the ending tag
     # ^.*  # from start
     # >\([^<>]\+\)< # capture everything between ><
     # \(\/td\|\/a\|span\) # patterns that signal end of info
@@ -33,8 +32,9 @@ extract_from_page() {
 }
 get_links(){
     # parse magnet link from chosen result and echo
-    links="$(grep '/torrent/' "${results}" | sed -e 's/^.*href="\/\(torrent.*\)\/">.*$/\1/')"
     magnets=""
+    results="$1"
+    links="$(grep '/torrent/' "$results" | sed -e 's/^.*href="\/\(torrent.*\)\/">.*$/\1/')"
     while read link; do
         magnet="$(curl -Ss "$BASE_RESULT_URL/$link/" |\
                   grep 'magnet' | head -1 |\
@@ -45,7 +45,7 @@ get_links(){
 }
 parse_results() {
     # parse downloaded torrent results into a tab delimited table for display
-    page="${1:-}"
+    page="$1"
     sed -i '/<\/th>/d' "$page" # filter crap
     links="$(get_links "$page")"
     names="$(extract_from_page $page 'coll-1 name' '\/a')"
@@ -56,14 +56,16 @@ parse_results() {
     paste <(echo "$links") <(echo "$sizes") <(echo "$dates") <(echo "$seeders") <(echo "$leechers") <(echo "$names")
 }
 main() {
-    query="${1:-}"
-    max_pages="${2:-}"
+    query="$1"
+    max_pages="$2"
     results="$(mktemp)"
     get_results "$query" "$max_pages" >| "$results"
+    wc -l $results 1>&2
     parse_results "$results" | grep -vi 'xxx' # filter porn
+    wc -l $results 1>&2
 }
 
 [[ $# -eq 2 ]] || (help  && exit 1)
-query="${1:-}"
-max_pages="${2:-}"
+query="$1"
+max_pages="$2"
 main "$query" "$max_pages"
