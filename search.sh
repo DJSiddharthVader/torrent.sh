@@ -1,7 +1,7 @@
 #!/bin/bash
 shopt -s extglob
 
-MAX_PAGES=4 # max number of results pages to parse when searching
+MAX_PAGES=3 # max number of results pages to parse when searching
 SEARCH_DIR="$(dirname $(readlink -e $0))"
 
 search() {
@@ -11,9 +11,9 @@ search() {
     [[ -z "$query" ]] && exit 1 # no query
     results=$(mktemp)
     "$SEARCH_DIR"/search_kickass.sh "$query" "$MAX_PAGES" >> "$results" 
-    # echo "Got kickass results" 1>&2
+    echo "Got kickass results" 1>&2
     "$SEARCH_DIR"/search_1337x.sh "$query" "$MAX_PAGES"  >> "$results"  
-    # echo "Got 1337x results" 1>&2
+    echo "Got 1337x results" 1>&2
     formatted_results="$(mktemp)"
     ids="$(seq 001 "$(wc -l "$results" | cut -d' ' -f1)")"  # make id for each torrent
     hashes="$(cut -f1 $results | sed -e 's/^.*btih:\([A-Z0-9]*\).*$/\1/')" # torrent hash for dedup
@@ -30,7 +30,7 @@ search() {
         # format results nicelly in columns, sort be seeders
         chosen="$(cut -f1,3- "$formatted_results" \
             | sed 's/ *\(\t\) */\1|/g' | column -s$'\t' -t \
-                  | rofi -dmenu -multi-select -lines 25 -width 80 -p "Pick Torrent")"
+            | rofi -dmenu -multi-select -lines 25 -width 80 -p "Pick Torrent")"
     fi
     [[ -z "$chosen" ]] && echo "no queries selected, exiting" && exit 0  # exit if no results chosen
     ids="$(echo "$chosen" | cut -d'|' -f1 | sed 's/^\([0-9]*\)[^0-9]*$/^\1 *\t/')"  # chosen torrent ids
