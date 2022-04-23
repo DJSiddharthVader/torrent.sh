@@ -6,17 +6,20 @@ MODE_FILE="$HOME/dotfiles/.config/polybar/modules.mode"
 MODE_PREFIX="torrent"
 STATS_FILE="$HOME/dotfiles/.config/transmission-daemon/stats.tsv"
 DOWNLOAD_DIR="$HOME/Torrents"
-VID_DIR="$HOME/Videos/ToOrganize"
+VID_DIR="$HOME/ToOrganize"
 MODES=(ratiototal datatotal ratio data speed active) #no spaces in mode titles
 DELIM="~"
 SEARCH_SCRIPT="$(dirname $(readlink -e $0))/search.sh"
 
+# Helpers
 help() {
     mode='$mode'
     echo "Usage: ./$(basename $0) -m $mode
 
     -u) {Ki|Mi|Gi|Ti}
         - specify unit for display
+
+    -d) display data for the specified mode but dont change it
 
     -m) $mode
         - display modes are {$(echo ${MODES[*]} | tr ' ' '|')}
@@ -36,7 +39,7 @@ help() {
         table   | print formatted table of torrents 
         filter  | print table of torrents filtered
                 | by criteria i.e. {ratio|done|undone|error}
-        del     | deleted torrents by criteria (same as table)
+        del     | deleted torrents by criteria (same as filter)
 "
 }
 init() {
@@ -70,6 +73,7 @@ getMode() {
 setMode() {
     sed -i "/^$MODE_PREFIX:/s/:.*/:$1/" "$MODE_FILE"
 }
+
 # Torrent Data Tracking
 get_info() {
     transmission-remote -tall -i
@@ -115,6 +119,7 @@ update_stats() {
     sort -t"$DELIM" -r -g -k5,5 -k4,4 $tmp | sort -u -t"$DELIM" -k1,1 -o $tmp #dedup
     mv $tmp $STATS_FILE
 }
+
 # Display Torrent Data
 sum_convert() {
     # sum list of data sizes and format to desired unit (Kb, Mb, Gb, Tb)
@@ -136,18 +141,18 @@ total_stats() {
         'down') fn=4 ;; # total download
         'up'  ) fn=5 ;; # total upload
     esac
-    terms="$(cut -d"$DELIM" -f$fn $STATS_FILE)"
+    terms="$(cut -d"$DELIM" -f$fn $STATS_FILE | grep -v '^$')"
     sum_convert "$terms" "$unit"
 }
 divide() {
-    num="$1"
-    denom="$2"
-    scale="$3"
+    num="${1:-}"
+    denom="${2:-}"
+    scale="${3:-}"
     echo "scale=$scale; $num/$denom" | bc | sed -e 's/^\./0./'
 }
 display() {
-    mode="$1"
-    unit="$2"
+    mode="${1:-}"
+    unit="${2:-}"
     info="$(get_info)"
     case "$mode" in
         'data') # amount of data uploaded/downloaded for current torrents
@@ -171,19 +176,16 @@ display() {
         'datatotal') # get total amount of data uploaded and downloaded for all current and previous torrents
             [[ -n "$unit" ]] || unit="Ti"
             [[ -z "$info" ]] || update_stats
-            up="$(total_stats 'up' "$unit")"
             down="$(total_stats 'down' "$unit")"
+            up="$(total_stats 'up' "$unit")"
             msg=" $down $unit  $up $unit"
             ;;
         'ratiototal') # get ratio of total downloaded to total size and total up to total down for all current and previous torrents
             [[ -n "$unit" ]] || unit="Ki"
             [[ -z "$info" ]] || update_stats
-            up="$(cut -d"$DELIM" -f5 $STATS_FILE)"
-            up="$(sum_convert "$up" "$unit")"
-            down="$(cut -d"$DELIM" -f4 $STATS_FILE)"
-            down="$(sum_convert "$down" "$unit")"
-            size="$(cut -d"$DELIM" -f3 $STATS_FILE)"
-            size="$(sum_convert "$size" "$unit")"
+            up="$(total_stats 'up' "$unit")"
+            down="$(total_stats 'down' "$unit")"
+            size="$(total_stats 'size' "$unit")"
             msg="T  $(divide $down $size 2)  $(divide $up $down 2)"
             ;;
         'speed') # total upload/download speed
@@ -206,6 +208,7 @@ display() {
     esac
     echo "$msg"
 }
+
 # Managing Torrents
 start_daemon() {
     sudo /etc/init.d/transmission-daemon start
@@ -226,8 +229,8 @@ filter_table() {
     mode="$1"
     case $mode in
         ratio) table="$(format_table | cut -f1,7,9 | grep -Pv '\t0\.[0-9]')" ;;
-        done) table="$(format_table | cut -f1,2,9 | grep '100%')" ;;
-        undone) table="$(format_table | cut -f1,2,9 | grep -v '100%')" ;;
+        done) table="$(format_table | cut -f2,3,9 | grep '100%')" ;;
+        undone) table="$(format_table | cut -f2,4,9 | grep -v '100%')" ;;
         error) table="$(format_table | grep '\*' | cut -f 1,2,9 | tr -d '*')" ;;
         all)  table="$(format_table)" ;;
         *) echo "Invalid del mode $mode, must be {all|error|done|undone|ratio}" && exit 1 ;;
@@ -236,15 +239,15 @@ filter_table() {
 }
 delete_torrents() {
     mode="$1"
-    ids="$(filter_table "$mode" | cut -f1)"
-    # remove and keep local data
-    transmission-remote -t"$(echo "$ids" | cut -f1 | tr '\n' ',')" --remove
+    ids="$(filter_table "$mode" | cut -f1 | tr '\n' ',' | sed -e 's/,$//')"
     # move all torrent files to Videos/ToOrganize
-    files="$(format_table | cut -f1,7,9 | grep "^(${ids/\n/\\\|/})" | rev | cut -f1 | rev)"
+    files="$(format_table | cut -f1,7,9 | grep -E "^(${ids//,/\|})" | rev | cut -f1 | rev)"
     while IFS= read -r file; do
-        echo "$file"
+        # echo "mv $DOWNLOAD_DIR/$file $VID_DIR"
         mv "$DOWNLOAD_DIR/$file" "$VID_DIR"
     done <<< "$files"
+    # remove and keep local data
+    transmission-remote -t"$ids" --remove
 }
 search() {
     # search online for torrents, get magnets and start downloading
@@ -291,8 +294,8 @@ main() {
         'display') display "$(getMode)" "$unit" ;;
         'current') echo "Current default is $(getMode)" ;;
         'table'  ) filter_table 'all' | column -s$'\t' -t ;;
-        'filter' ) filter_table "$2";;
-        'del'    ) delete_torrents "$2" ;;
+        'filter' ) filter_table "${2:-}";;
+        'del'    ) delete_torrents "${2:-}" ;;
         *) # change/set display mode
             tmp="@($(echo ${MODES[*]} | sed -e 's/ /|/g'))"
             case "$mode" in
