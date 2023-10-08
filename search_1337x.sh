@@ -1,10 +1,10 @@
 #!/bin/bash
 shopt -s extglob
-
+# Vars
 BASE_URL="https://1337x.to"
 BASE_SEARCH_URL="$BASE_URL/search"
 BASE_RESULT_URL="$BASE_URL"
-
+# Functions
 help() {
     echo "Usage: ./$(basename $0) query max_pages"
 }
@@ -17,7 +17,7 @@ get_results() {
     [[ $max_pages -lt $total_pages ]] && total_pages=$max_pages
     for page_num in $(seq 1 $total_pages); do
         search_url="$BASE_SEARCH_URL/${query// /+}/$page_num/"
-        echo $search_url 1>&2
+        # echo $search_url 1>&2
         curl -Ss "$search_url" 
     done
 }
@@ -60,11 +60,11 @@ main() {
     max_pages="$2"
     results="$(mktemp)"
     get_results "$query" "$max_pages" >| "$results"
-    wc -l $results 1>&2
+    # wc -l $results 1>&2
     parse_results "$results" | grep -vi 'xxx' # filter porn
-    wc -l $results 1>&2
+    # wc -l $results 1>&2
 }
-
+# Main
 [[ $# -eq 2 ]] || (help  && exit 1)
 query="$1"
 max_pages="$2"

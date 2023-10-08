@@ -1,41 +1,48 @@
 #!/bin/bash
 shopt -s extglob
-
-MAX_PAGES=3 # max number of results pages to parse when searching
+# Vars
+MAX_PAGES=2  # max number of results pages to parse when searching
 SEARCH_DIR="$(dirname $(readlink -e $0))"
-
+# Functions
 search() {
-    # download search results for query
-    echo "Searching..." 1>&2
-    query="$(rofi -lines 0 -dmenu -p "Enter Torrent Query")"
+    # Ask for Torrent query
+    killall -q rofi
+    # echo "Searching..." 1>&2
+    query="$(rofi -l 0 -dmenu -p "Enter Torrent Query")"
+    # query="$(dmenu -p "Enter Torrent Query" < /dev/null)"
     [[ -z "$query" ]] && exit 1 # no query
+    # echo "$query"
+    # Search specific sites for resutls
     results=$(mktemp)
     "$SEARCH_DIR"/search_kickass.sh "$query" "$MAX_PAGES" >> "$results" 
-    echo "Got kickass results" 1>&2
+    # echo "Got kickass results" 1>&2
     "$SEARCH_DIR"/search_1337x.sh "$query" "$MAX_PAGES"  >> "$results"  
-    echo "Got 1337x results" 1>&2
+    # echo "Got 1337x results" 1>&2
     formatted_results="$(mktemp)"
-    ids="$(seq 001 "$(wc -l "$results" | cut -d' ' -f1)")"  # make id for each torrent
-    hashes="$(cut -f1 $results | sed -e 's/^.*btih:\([A-Z0-9]*\).*$/\1/')" # torrent hash for dedup
-    # paste <(echo "$ids") $results \
+    # Get ID and Hash to dedup torrente between sites
+    ids="$(seq 001 "$(wc -l "$results" | cut -d' ' -f1)")"  
+    hashes="$(cut -f1 $results | sed -e 's/^.*btih:\([A-Z0-9]*\).*$/\1/')" 
+    # Allow user to pick which torrents to download
     paste <(echo "$hashes") <(echo "$ids") $results \
             | sort -t$'\t' -k1,1 -u | cut -f 2- \
             | tr -s ' ' \
             | sort -t$'\t' -k5 -gr >| $formatted_results  
-    # pick result(s)
+    # Exit if no torrent Info was fetched
     if [[ "$(wc -l $formatted_results | cut -d' ' -f1)" -lt 2 ]]; then  
-        rofi -dmenu -lines 1 -width 80 -p "no results for $query"  # if no results, quit
+        rofi -dmenu -l 1 -width 80 -p "no results for $query"  
         exit 0
-    else
-        # format results nicelly in columns, sort be seeders
-        chosen="$(cut -f1,3- "$formatted_results" \
-            | sed 's/ *\(\t\) */\1|/g' | column -s$'\t' -t \
-            | rofi -dmenu -multi-select -lines 25 -width 80 -p "Pick Torrent")"
     fi
-    [[ -z "$chosen" ]] && echo "no queries selected, exiting" && exit 0  # exit if no results chosen
-    ids="$(echo "$chosen" | cut -d'|' -f1 | sed 's/^\([0-9]*\)[^0-9]*$/^\1 *\t/')"  # chosen torrent ids
-    grep -f <(echo "$ids") "$formatted_results" | cut -f2  # print all chosen magnet lints to stdout
-    # send notification
+    # Allow to chose torrents
+    chosen="$(cut -f1,3- "$formatted_results" \
+        | sed 's/ *\(\t\) */\1|/g' | column -s$'\t' -t \
+        | rofi -dmenu -multi-select -l 25 -width 80 -p "Pick Torrent")"
+        # | dmenu -i -l 25 -fn "Ubuntu-18" -p "Pick Torrent")"
+    # exit if no results chosen
+    [[ -z "$chosen" ]] && echo "no queries selected, exiting" && exit 0  
+    # Print all chosen results to stdout for downloading
+    chosen_ids="$(echo "$chosen" | cut -d'|' -f1 | sed 's/^\([0-9]*\)[^0-9]*$/^\1 *\t/')"
+    grep -f <(echo "$chosen_ids") "$formatted_results" | cut -f2 | grep -o -E "href=[\"'](.*)[\"'] " | grep -o -E "magnet\:.*$"
+    # send notification of how many torrents downloaded
     total="$(wc -l $formatted_results | cut -d' ' -f1)"
     if [[ $total -eq 1 ]]; then
         name="$(head -1 "$chosen" | rev | cut -f1 | rev | tr -s ' ' '.')"
@@ -45,5 +52,5 @@ search() {
         notify-send "Query: $query, Links added: $links_added"  # how many links found
     fi
 }
-
+# Main
 search

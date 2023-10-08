@@ -1,7 +1,7 @@
 #!/bin/bash
 set -uo pipefail
 shopt -s extglob
-
+# Names
 MODE_FILE="$HOME/dotfiles/.config/polybar/modules.mode"
 MODE_PREFIX="torrent"
 STATS_FILE="$HOME/dotfiles/.config/transmission-daemon/stats.tsv"
@@ -10,7 +10,6 @@ VID_DIR="$HOME/ToOrganize"
 MODES=(ratiototal datatotal ratio data speed active) #no spaces in mode titles
 DELIM="~"
 SEARCH_SCRIPT="$(dirname $(readlink -e $0))/search.sh"
-
 # Helpers
 help() {
     mode='$mode'
@@ -73,7 +72,6 @@ getMode() {
 setMode() {
     sed -i "/^$MODE_PREFIX:/s/:.*/:$1/" "$MODE_FILE"
 }
-
 # Torrent Data Tracking
 get_info() {
     transmission-remote -tall -i
@@ -119,7 +117,6 @@ update_stats() {
     sort -t"$DELIM" -r -g -k5,5 -k4,4 $tmp | sort -u -t"$DELIM" -k1,1 -o $tmp #dedup
     mv $tmp $STATS_FILE
 }
-
 # Display Torrent Data
 sum_convert() {
     # sum list of data sizes and format to desired unit (Kb, Mb, Gb, Tb)
@@ -208,7 +205,6 @@ display() {
     esac
     echo "$msg"
 }
-
 # Managing Torrents
 start_daemon() {
     sudo /etc/init.d/transmission-daemon start
@@ -251,15 +247,13 @@ delete_torrents() {
 }
 search() {
     # search online for torrents, get magnets and start downloading
-    echo $SEARCH_SCRIPT
     magnets="$($SEARCH_SCRIPT)"
-    echo -e "Adding torrents..."
+    echo "$magnets"
     for magnet in ${magnets}; do
         transmission-remote -er -w $DOWNLOAD_DIR --add ${magnet}
     done
-    echo "Added all torrents"
 }
-
+# Main
 main() {
     # to avoid strict errors from -euo
     unit=""
@@ -312,6 +306,5 @@ main() {
             ;;
     esac
 }
-
 [ $# -eq 0 ] && help && exit 1
 main "$@"
