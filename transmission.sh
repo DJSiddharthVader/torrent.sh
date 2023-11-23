@@ -248,8 +248,8 @@ delete_torrents() {
 search() {
     # search online for torrents, get magnets and start downloading
     magnets="$($SEARCH_SCRIPT)"
-    echo "$magnets"
     for magnet in ${magnets}; do
+        echo "$magnet"
         transmission-remote -er -w $DOWNLOAD_DIR --add ${magnet}
     done
 }
