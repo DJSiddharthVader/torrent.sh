@@ -40,8 +40,7 @@ search() {
     chosen="$(cut -f1,3- "$formatted_results" \
               | sed 's/ *\(\t\) */\1|/g' \
               | column -s$'\t' -t \
-              | rofi -dmenu -multi-select -l 25 -theme-str 'window {width:90%;}' -p "Pick Torrent")"
-        # | dmenu -i -l 25 -fn "Ubuntu-18" -p "Pick Torrent")"
+              | rofi -theme-str 'window {width:90%;}' -dmenu -multi-select -l 25 -p "Pick Torrent")"
     [[ -z "$chosen" ]] && echo "no queries selected, exiting" && exit 0  
     # Print all chosen results to stdout for downloading
     chosen_ids="$(echo "$chosen" \
