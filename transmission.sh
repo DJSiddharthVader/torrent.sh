@@ -92,7 +92,7 @@ scrape_stats() {
     info="$1"
     pattern="$2"
     extract "$info" "$pattern" \
-            | sed -e 's/None/ /g' \
+            | sed -e 's/None/0/g' \
             | sed -e "s/\([0-9\.]*\) \([BKMGbkmg]\).*/\1\U\2\Li /" \
             | sed -e 's/0Bi /0 /' \
             | tr -d '\n' \
@@ -155,7 +155,9 @@ display() {
         'data') # amount of data uploaded/downloaded for current torrents
             [[ -n "$unit" ]] || unit="Gi"
             up="$(scrape_stats "$info" 'Uploaded')"
+            echo $up
             up="$(sum_convert "$up" "$unit")"
+            echo $up
             down="$(scrape_stats "$info" 'Downloaded')"
             down="$(sum_convert "$down" "$unit")"
             [[ -z "$up$down" ]] &&  msg=" - $unit  - $unit" || msg=" $down $unit  $up $unit"
